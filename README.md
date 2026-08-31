@@ -138,7 +138,7 @@ so an image request can never be routed to a pricier video model by accident.
 # text to image
 openart generate image "a red fox in the snow" --model nano-banana-2
 
-# image to image: pass a local file or a URL
+# image to image: a local file, or a URL already on https://cdn.openart.ai
 openart generate image "make it snowy" --model nano-banana-2 --image ./fox.png
 
 # download the result instead of just printing its URL
@@ -151,7 +151,9 @@ openart generate video "slow zoom in" --model kling-3-omni --image ./photo.jpg
 ```
 
 Each command submits the job, polls until it finishes (bounded by `--timeout`,
-default 5 minutes), and prints the result. `--duration`, `--aspect-ratio`, and
+default 5 minutes), and prints the result. Pass `--async` to skip the wait: the
+command submits, prints the generation's id, and exits, leaving you to pick the
+result up later with `openart creation wait <id>`. `--duration`, `--aspect-ratio`, and
 `--resolution` are model-specific — omit them to take the model's own defaults.
 
 ## Finding models, and what they cost
@@ -176,6 +178,7 @@ openart project list
 openart project create --name "My Project"
 openart workspace list                      # the active one is marked *
 openart workspace select <workspace-id>
+openart workspace select                    # back to your personal workspace
 
 openart upload add ./reference.png          # prints a URL to use in a generation
 openart upload list --type image
@@ -183,15 +186,25 @@ openart upload list --type image
 
 ## Scripting and agents
 
-Two flags make the CLI safe to drive from a program:
+Three flags make the CLI safe to drive from a program:
 
 - **`--json`** — every command emits machine-readable JSON on stdout. Pagination
   cursors and progress go to stderr, so a pipe stays clean.
 - **`--dry-run`** — every command that writes or spends credits prints the exact
   request it *would* send, then exits 0.
+- **`--async`** — `generate` submits and returns immediately, printing the
+  generation's id instead of waiting for the result. Pick it up whenever you
+  like with `creation wait` / `creation get`, so a slow video does not pin a
+  process open. Not combinable with `-o/--output`, which needs a finished
+  generation to download.
 
 ```sh
 openart generate image "test" --model nano-banana-2 --dry-run
+
+# submit now, collect later
+id=$(openart generate video "a paper boat" --model pixverseV6 --async)
+openart creation wait "$id"
+
 openart model cost --json | jq -r '.items[] | "\(.model)\t\(.totalCredits)"'
 openart creation list --json --limit 5 | jq -r '.data[].url'
 ```
